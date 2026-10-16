@@ -511,9 +511,12 @@ const getTranslationResultCacheHash = (text, isPhonetic = false) => {
 
   const translationStyle =
     window.AIAddonManager?.getTranslationStyle?.() || "natural";
-  return translationStyle !== "natural"
+  // Must match LyricsService's key, which versions NetEase translations so addon fixes bypass old cache
+  return (translationStyle !== "natural"
     ? `${sourceHash}:style=${translationStyle}`
-    : sourceHash;
+    : sourceHash) + (window.AIAddonManager?.isProviderEnabled?.("netease-translation")
+      ? `:netease=${window.AIAddonManager.getAddon?.("netease-translation")?.version || "1"}`
+      : "");
 };
 
 const getLyricsProcessingShapeSignature = (lyrics = []) => {

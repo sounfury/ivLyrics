@@ -9652,7 +9652,9 @@
                 ? `${sourceTextHash}:phonetic-prompt=${PHONETIC_PROMPT_CACHE_VERSION}:notation=${resolvedPronunciationNotation}`
                 : (translationStyle !== 'natural'
                     ? `${sourceTextHash}:style=${translationStyle}`
-                    : sourceTextHash);
+                    : sourceTextHash) + (window.AIAddonManager?.isProviderEnabled?.('netease-translation')
+                        ? `:netease=${window.AIAddonManager.getAddon?.('netease-translation')?.version || '1'}`
+                        : '');
 
             let finalTrackId = trackId;
             if (!finalTrackId) {
