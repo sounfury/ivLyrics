@@ -80,6 +80,7 @@
 		"Addon_AI_DeepL.js",
 		"Addon_AI_Gemini.js",
 		"Addon_AI_GoogleTranslate.js",
+		"Addon_AI_NeteaseTranslation.js",
 		"Addon_AI_Groq.js",
 		"Addon_AI_OpenRouter.js",
 		"Addon_AI_Paxsenix.js",
