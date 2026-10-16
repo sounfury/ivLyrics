@@ -160,8 +160,8 @@
       style.textContent = `
         :root{color-scheme:dark;--size:${size}px}*{box-sizing:border-box}
         body{margin:0;background:#131b1a;color:#f4f0e8;font-family:'Yu Gothic UI','Microsoft YaHei UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-        header{display:flex;align-items:center;gap:14px;padding:12px 20px 6px;font-size:11px;color:#94a6a0}
-        #title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:5px 7px;border-radius:5px}button:hover{color:#fff;background:#ffffff12}button:focus-visible{outline:2px solid #b8e6cf}
+        header{display:flex;align-items:center;gap:14px;min-height:36px;padding:12px 20px 6px;font-size:11px;color:#94a6a0;-webkit-app-region:drag;app-region:drag;cursor:move}
+        #title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:5px 7px;border-radius:5px;-webkit-app-region:no-drag;app-region:no-drag}button:hover{color:#fff;background:#ffffff12}button:focus-visible{outline:2px solid #b8e6cf}
         main{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:10px 24px 18px;gap:12px}
         #line{font-size:var(--size);font-weight:700;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}
         .syllable{--fill:0%;background:linear-gradient(to right,#f4f0e8 var(--fill),#687770 var(--fill));background-clip:text;-webkit-background-clip:text;color:transparent}
@@ -170,7 +170,7 @@
         @media(max-height:200px){header{padding:5px 14px 0}main{padding:4px 15px 8px;gap:4px}#next{display:none}}
       `;
       pip.document.head.appendChild(style);
-      pip.document.body.innerHTML = '<header><span id="title"></span><button id="smaller" aria-label="缩小字号">A−</button><button id="larger" aria-label="放大字号">A+</button><button id="play">播放</button></header><main><div id="line"></div><div id="translation"></div><div id="next"></div></main>';
+      pip.document.body.innerHTML = '<header title="拖动歌名区域移动窗口"><span id="title"></span><button id="smaller" aria-label="缩小字号">A−</button><button id="larger" aria-label="放大字号">A+</button><button id="play">播放</button></header><main><div id="line"></div><div id="translation"></div><div id="next"></div></main>';
       nodes = Object.fromEntries(['title', 'line', 'translation', 'next', 'play'].map(id => [id, pip.document.getElementById(id)]));
       nodes.play.onclick = () => Spicetify.Player.togglePlay();
       const resize = delta => {
