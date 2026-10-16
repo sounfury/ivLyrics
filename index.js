@@ -2772,71 +2772,71 @@ const CONFIG = {
       "none",
     "translation-mode-2:english":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:english") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:japanese":
       StorageManager.getItem(
         "ivLyrics:visual:translation-mode-2:japanese"
-      ) || "none",
+      ) || "gemini_ko",
     "translation-mode-2:korean":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:korean") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:chinese":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:chinese") ||
       "none",
     "translation-mode-2:russian":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:russian") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:vietnamese":
       StorageManager.getItem(
         "ivLyrics:visual:translation-mode-2:vietnamese"
-      ) || "none",
+      ) || "gemini_ko",
     "translation-mode-2:german":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:german") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:swedish":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:swedish") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:spanish":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:spanish") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:french":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:french") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:italian":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:italian") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:portuguese":
       StorageManager.getItem(
         "ivLyrics:visual:translation-mode-2:portuguese"
-      ) || "none",
+      ) || "gemini_ko",
     "translation-mode-2:dutch":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:dutch") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:polish":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:polish") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:turkish":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:turkish") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:arabic":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:arabic") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:hindi":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:hindi") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:thai":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:thai") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:indonesian":
       StorageManager.getItem(
         "ivLyrics:visual:translation-mode-2:indonesian"
-      ) || "none",
+      ) || "gemini_ko",
     "translation-mode-2:malay":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:malay") ||
-      "none",
+      "gemini_ko",
     "translation-mode-2:gemini":
       StorageManager.getItem("ivLyrics:visual:translation-mode-2:gemini") ||
-      "none",
+      "gemini_ko",
     "gemini-api-key":
       StorageManager.getPersisted("ivLyrics:visual:gemini-api-key") || "",
     "gemini-api-key-romaji":

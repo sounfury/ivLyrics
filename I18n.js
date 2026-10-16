@@ -9,7 +9,7 @@
     let languageData = {};
     let fallbackData = {};
     const STORAGE_KEY = "ivLyrics:visual:language";
-    const DEFAULT_LANGUAGE = "ko";
+    const DEFAULT_LANGUAGE = "zh-CN";
     const LANGUAGE_CODES = ["ko", "en", "zh-CN", "zh-TW", "ja", "es", "fr", "de", "it", "ru", "sv", "pt", "hi", "ar", "fa", "bn", "cs", "th", "tr", "vi", "id", "ms"];
     const AVAILABLE_LANGUAGES = [];
     const KEY_PATH_CACHE_LIMIT = 2048;
@@ -224,6 +224,12 @@
         refreshAvailableLanguages();
 
         // Get saved language
+        try {
+            if (localStorage.getItem("ivLyrics:zh-cn-default-applied") !== "1") {
+                storeLanguage("zh-CN");
+                localStorage.setItem("ivLyrics:zh-cn-default-applied", "1");
+            }
+        } catch (e) { }
         let savedLang = getStoredLanguage();
 
         if (!savedLang || AVAILABLE_LANGUAGES.indexOf(savedLang) === -1) {
