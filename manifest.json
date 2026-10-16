@@ -101,6 +101,7 @@
 		"PlaybackClock.js",
 		"LyricsService.js",
 		"OverlayService.js",
+		"DesktopLyrics.js",
 		"PlaybarButton.js",
 		"VideoBackgroundDepend.js",
 		"GlobalShortcuts.js",
