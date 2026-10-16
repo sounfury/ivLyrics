@@ -88,6 +88,7 @@
 		"Addon_AI_LocalModel.js",
 		"LrclibLocalDatabaseRuntime.js",
 		"LrclibLocalDatabase.js",
+		"Addon_Lyrics_Netease.js",
 		"Addon_Lyrics_Lrclib.js",
 		"Addon_Lyrics_LyricsPlus.js",
 		"Addon_Lyrics_Unison.js",
