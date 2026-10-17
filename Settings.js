@@ -139,6 +139,14 @@ const OverlaySettings = () => {
   const [checking, setChecking] = useState(false);
   const [port, setPort] = useState(window.OverlaySender?.port ?? 15000);
   const [portInput, setPortInput] = useState(String(window.OverlaySender?.port ?? 15000));
+  const [desktopAutoOpen, setDesktopAutoOpen] = useState(window.ivLyricsDesktop?.autoOpen ?? false);
+
+  // The picture-in-picture window has the same toggle; keep both in sync.
+  useEffect(() => {
+    const handleAutoOpen = (e) => setDesktopAutoOpen(!!e.detail);
+    window.addEventListener('ivLyrics:desktop-auto-open', handleAutoOpen);
+    return () => window.removeEventListener('ivLyrics:desktop-auto-open', handleAutoOpen);
+  }, []);
 
   // 연결 상태 이벤트 리스너
   useEffect(() => {
@@ -316,6 +324,38 @@ const OverlaySettings = () => {
       )
     );
 
+  const renderDesktopAutoOpenRow = () =>
+    react.createElement(
+      "div",
+      { className: "setting-row is-inline is-toggle-row", "data-setting-key": "desktop-lyrics-auto-open" },
+      react.createElement(
+        "div",
+        { className: "setting-row-content" },
+        react.createElement(
+          "div",
+          {
+            className: "setting-row-left",
+            onPointerDown: handleSettingsToggleRowPointerDown,
+            onClick: handleSettingsToggleRowClick,
+          },
+          react.createElement("div", { className: "setting-name-row" },
+            react.createElement("div", { className: "setting-name" }, "播放时自动打开桌面歌词")),
+          react.createElement("div", { className: "setting-description" },
+            "开始播放音乐时自动打开画中画歌词窗口。用媒体键或其他设备开始播放时，浏览器要求先有一次操作，窗口会在你下次点击或按键时打开。")
+        ),
+        react.createElement(
+          "div",
+          { className: "setting-row-right" },
+          react.createElement(ConfigSlider, {
+            name: "播放时自动打开桌面歌词",
+            defaultValue: desktopAutoOpen,
+            disabled: !window.ivLyricsDesktop,
+            onChange: (value) => window.ivLyricsDesktop?.setAutoOpen(value)
+          })
+        )
+      )
+    );
+
   const renderOverlayPortRow = () =>
     // Port Setting Row (Only shown when enabled)
     enabled && react.createElement(
@@ -358,6 +398,7 @@ const OverlaySettings = () => {
   return react.createElement(
     "div",
     { className: "option-list-wrapper" },
+    renderDesktopAutoOpenRow(),
     // Enable/Disable Row
     renderOverlayEnableRow(),
     renderOverlayTrimRow(),

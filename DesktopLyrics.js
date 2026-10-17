@@ -3,12 +3,24 @@
   'use strict';
   if (window.ivLyricsDesktop) return;
   const ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm0 16H5V5h14v14Zm-9-8h7v6h-7z"/></svg>';
+  const PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>';
+  const PAUSE = '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>';
+  const PREV = '<svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 6.2v11.6a1 1 0 0 1-1.55.83L10 12.83a1 1 0 0 1 0-1.66l8.45-5.8A1 1 0 0 1 20 6.2Z"/></svg>';
+  const NEXT = '<svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 6.2v11.6a1 1 0 0 0 1.55.83L14 12.83a1 1 0 0 0 0-1.66l-8.45-5.8A1 1 0 0 0 4 6.2Z"/></svg>';
+  const MIN_SIZE = 16, MAX_SIZE = 44;
+  const AUTO_OPEN_KEY = 'ivLyrics:desktop:auto-open';
   let pip = null, timer = null, button = null, opening = false;
+  let autoOpen = false, wasPlaying = false, pendingOpen = false;
+  try { autoOpen = localStorage.getItem(AUTO_OPEN_KEY) === 'true'; } catch {}
   let uri = null, lines = [], active = -2, currentLine = null, offset = 0;
   let generation = 0, snapshotRevision = null, loadError = '', lastOffsetCheck = 0;
-  let nodes = null, syllableNodes = [], size = 30;
-  try { size = Math.max(18, Math.min(60, Number(localStorage.getItem('ivLyrics:desktop:font-size')) || 30)); } catch {}
+  let nodes = null, syllableNodes = [], size = 24, paused = null;
+  try { size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, Number(localStorage.getItem('ivLyrics:desktop:font-size')) || 24)); } catch {}
 
+  const imageUrl = raw => {
+    const url = String(raw || '');
+    return url.startsWith('spotify:image:') ? `https://i.scdn.co/image/${url.split(':').pop()}` : url;
+  };
   const getTrack = () => {
     const item = Spicetify.Player.data?.item;
     return item?.uri ? {
@@ -16,7 +28,8 @@
       title: item.name || item.metadata?.title || '',
       artist: item.artists?.map(a => a.name).join(', ') || item.metadata?.artist_name || '',
       album: item.album?.name || item.metadata?.album_title || '',
-      duration: item.duration?.milliseconds || Number(item.metadata?.duration) || 0
+      duration: item.duration?.milliseconds || Number(item.metadata?.duration) || 0,
+      cover: imageUrl(item.images?.[0]?.url || item.album?.images?.[0]?.url || item.metadata?.image_url)
     } : null;
   };
   const original = line => String(line?.originalText || line?.text || '');
@@ -37,6 +50,21 @@
     } catch { /* A missing offset must not stop playback. */ }
   }
 
+  async function refreshAccent(track, token) {
+    try {
+      const colors = await Spicetify.colorExtractor?.(track.uri);
+      const accent = colors?.VIBRANT_NON_ALARMING || colors?.VIBRANT || colors?.LIGHT_VIBRANT;
+      if (token === generation && nodes && accent) pip.document.documentElement.style.setProperty('--accent', accent);
+    } catch { /* Keep the default accent. */ }
+  }
+
+  function showTrack(track) {
+    nodes.island.title = track ? `${track.title} · ${track.artist}` : '';
+    nodes.cover.style.backgroundImage = track?.cover ? `url("${track.cover.replace(/"/g, '%22')}")` : '';
+    nodes.cover.classList.toggle('empty', !track?.cover);
+    pip.document.documentElement.style.removeProperty('--accent');
+  }
+
   async function loadTrack(track) {
     const token = ++generation;
     uri = track?.uri || null;
@@ -46,8 +74,9 @@
     snapshotRevision = null;
     loadError = '';
     offset = 0;
-    nodes.title.textContent = track ? `${track.title} · ${track.artist}` : '暂无播放';
+    showTrack(track);
     if (!track) return;
+    void refreshAccent(track, token);
     await refreshOffset(track, token);
     if (token !== generation) return;
     const snapshot = window.LyricsService?.getLyricsSnapshot?.(uri);
@@ -73,14 +102,30 @@
     }
   }
 
+  // Long lines shrink to fit one row first; very long ones wrap to two rows.
+  function fit() {
+    const el = nodes.line;
+    el.classList.remove('wrap');
+    el.style.setProperty('--fit', '1');
+    const ratio = el.clientWidth / Math.max(1, el.scrollWidth);
+    if (ratio >= 1) return;
+    if (ratio >= 0.66) el.style.setProperty('--fit', (ratio * 0.98).toFixed(3));
+    else {
+      el.style.setProperty('--fit', '0.72');
+      el.classList.add('wrap');
+    }
+  }
+
   function renderLine(index) {
     const line = lines[index];
+    const changed = index !== active;
     active = index;
     currentLine = line;
     syllableNodes = [];
     nodes.line.replaceChildren();
     const lead = line?.vocals?.lead;
     const units = lead?.syllables || line?.syllables;
+    const track = getTrack();
     if (units?.length) {
       for (const unit of units) {
         const span = pip.document.createElement('span');
@@ -89,11 +134,23 @@
         nodes.line.appendChild(span);
         syllableNodes.push({ span, start: Number(unit.startTime), end: Number(unit.endTime), value: -1 });
       }
+    } else if (line) {
+      nodes.line.textContent = original(line) || '♪';
     } else {
-      nodes.line.textContent = line ? original(line) : (!uri ? '暂无播放' : loadError || (lines.length ? '♪' : '正在加载歌词…'));
+      // Before the first line (or without lyrics) the island shows the song, like a music activity.
+      nodes.line.textContent = track ? track.title : '暂无播放';
     }
-    nodes.translation.textContent = translation(line);
+    nodes.translation.textContent = line
+      ? translation(line)
+      : (!uri ? '' : loadError || (lines.length ? track?.artist || '' : '正在加载歌词…'));
     nodes.next.textContent = original(lines[index >= 0 ? index + 1 : 0]);
+    fit();
+    if (changed && !pip.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      nodes.lyrics.animate([
+        { opacity: 0, transform: 'translateY(8px) scale(.98)', filter: 'blur(4px)' },
+        { opacity: 1, transform: 'none', filter: 'none' }
+      ], { duration: 320, easing: 'cubic-bezier(.2,.9,.3,1.2)' });
+    }
   }
 
   function tick() {
@@ -109,8 +166,9 @@
       lastOffsetCheck = Date.now();
       void refreshOffset(track, generation);
     }
+    const progress = Spicetify.Player.getProgress();
     // getSyncOffset is the amount added to lyric timestamps by the overlay sender.
-    const position = Spicetify.Player.getProgress() - offset;
+    const position = progress - offset;
     let index = -1;
     for (let i = 0; i < lines.length; i++) {
       if (Number.isFinite(lines[i].startTime) && lines[i].startTime <= position) index = i;
@@ -125,9 +183,15 @@
         unit.value = value;
       }
     }
-    const paused = !Spicetify.Player.isPlaying();
-    nodes.play.textContent = paused ? '播放' : '暂停';
-    nodes.play.setAttribute('aria-label', paused ? '播放' : '暂停');
+    const duration = Spicetify.Player.getDuration?.() || track?.duration || 0;
+    nodes.progress.style.transform = `scaleX(${duration ? Math.max(0, Math.min(1, progress / duration)) : 0})`;
+    const nowPaused = !Spicetify.Player.isPlaying();
+    if (nowPaused !== paused) {
+      paused = nowPaused;
+      nodes.play.innerHTML = paused ? PLAY : PAUSE;
+      nodes.play.setAttribute('aria-label', paused ? '播放' : '暂停');
+      nodes.island.classList.toggle('paused', paused);
+    }
   }
 
   function cleanup() {
@@ -141,8 +205,60 @@
     active = -2;
     currentLine = null;
     syllableNodes = [];
+    paused = null;
     button && (button.active = false);
   }
+
+  const STYLE = `
+    :root{color-scheme:dark;--size:24px;--accent:#9df0c8;background:#000}*{box-sizing:border-box}
+    body{margin:0;height:100vh;overflow:hidden;background:#000;color:#fff;font-family:'SF Pro Display','Segoe UI Variable Display','Microsoft YaHei UI','Yu Gothic UI',sans-serif;-webkit-font-smoothing:antialiased;user-select:none}
+    #island{position:relative;height:100%;display:flex;align-items:center;gap:14px;padding:10px 14px 10px 12px;-webkit-app-region:drag;app-region:drag;cursor:grab}
+    #cover{flex:none;width:44px;height:44px;border-radius:12px;background:#1c1c1e center/cover no-repeat;box-shadow:0 0 0 .5px #ffffff1f inset;transition:transform .45s cubic-bezier(.2,.9,.3,1.3)}
+    #cover.empty{background-image:radial-gradient(circle at 30% 30%,#3a3a3c,#1c1c1e)}
+    .paused #cover{transform:scale(.86)}
+    #lyrics{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px}
+    #line{--fit:1;font-size:calc(var(--size) * var(--fit));font-weight:650;letter-spacing:-.01em;line-height:1.28;white-space:pre;overflow:hidden}
+    #line.wrap{white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+    .syllable{--fill:0%;background:linear-gradient(to right,#fff var(--fill),#ffffff52 var(--fill));background-clip:text;-webkit-background-clip:text;color:transparent}
+    #translation{font-size:calc(var(--size) * .56);color:#ffffffa6;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #translation:empty{display:none}
+    #next{display:none;margin-top:4px;font-size:calc(var(--size) * .56);color:#ffffff59;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #side{flex:none;position:relative;width:34px;height:100%;display:flex;align-items:center;justify-content:center;-webkit-app-region:no-drag;app-region:no-drag;cursor:default}
+    #bars{display:flex;align-items:center;gap:3px;height:22px;transition:opacity .2s}
+    #bars i{width:3.5px;height:100%;border-radius:2px;background:var(--accent);transform-origin:center;animation:wave 1.1s ease-in-out infinite alternate}
+    #bars i:nth-child(2){animation-duration:.8s;animation-delay:-.4s}#bars i:nth-child(3){animation-duration:1.3s;animation-delay:-.7s}#bars i:nth-child(4){animation-duration:.95s;animation-delay:-.2s}
+    @keyframes wave{0%{transform:scaleY(.25)}50%{transform:scaleY(1)}100%{transform:scaleY(.45)}}
+    .paused #bars i{animation-play-state:paused;opacity:.45}
+    #controls{position:absolute;right:-6px;top:50%;display:flex;align-items:center;gap:2px;padding:4px 4px 4px 36px;background:linear-gradient(to right,#0000,#000 32px);transform:translateY(-50%) scale(.92);transform-origin:right center;opacity:0;visibility:hidden;transition:opacity .18s,transform .28s cubic-bezier(.2,.9,.3,1.3),visibility 0s .18s}
+    #side:hover #bars{opacity:0}
+    #side:hover #controls{opacity:1;visibility:visible;transform:translateY(-50%);transition-delay:0s}
+    button{-webkit-app-region:no-drag;app-region:no-drag;flex:none;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:#fff;font-family:inherit;font-size:12px;font-weight:600;line-height:1;cursor:pointer;transition:background .15s,transform .15s}
+    button:hover{background:#ffffff1f}button:active{transform:scale(.9)}button:focus-visible{outline:2px solid var(--accent)}
+    button svg{width:18px;height:18px;fill:currentColor}#play svg{width:22px;height:22px}
+    .text{width:28px;color:#ffffffb3}
+    #auto{width:36px;border-radius:16px}#auto.on{color:#000;background:var(--accent)}
+    #progress{position:absolute;left:14px;right:14px;bottom:5px;height:2px;border-radius:1px;background:var(--accent);transform-origin:left;opacity:0;transition:opacity .2s}
+    #island:has(#side:hover) #progress{opacity:.85}
+    @media(min-height:150px){#next:not(:empty){display:block}#cover{width:56px;height:56px;border-radius:14px}}
+    @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  `;
+  const MARKUP = `
+    <div id="island">
+      <div id="cover"></div>
+      <div id="lyrics"><div id="line"></div><div id="translation"></div><div id="next"></div></div>
+      <div id="side">
+        <div id="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div id="controls">
+          <button id="auto" class="text" aria-label="播放时自动打开" title="播放音乐时自动打开桌面歌词">自动</button>
+          <button id="smaller" class="text" aria-label="缩小字号" title="缩小字号">A−</button>
+          <button id="larger" class="text" aria-label="放大字号" title="放大字号">A+</button>
+          <button id="prev" aria-label="上一首" title="上一首">${PREV}</button>
+          <button id="play" aria-label="播放"></button>
+          <button id="nextTrack" aria-label="下一首" title="下一首">${NEXT}</button>
+        </div>
+      </div>
+      <div id="progress"></div>
+    </div>`;
 
   async function open() {
     if (pip && !pip.closed) { pip.focus(); return; }
@@ -154,32 +270,29 @@
     opening = true;
     try {
       // Must be requested directly from the user's click, before any async work.
-      pip = await documentPictureInPicture.requestWindow({ width: 660, height: 280 });
+      // The browser places the window; pages cannot move it (moveTo is disabled for PiP).
+      pip = await documentPictureInPicture.requestWindow({ width: 600, height: 96 });
       pip.document.title = 'ivLyrics · 桌面歌词';
       const style = pip.document.createElement('style');
-      style.textContent = `
-        :root{color-scheme:dark;--size:${size}px}*{box-sizing:border-box}
-        body{margin:0;background:#131b1a;color:#f4f0e8;font-family:'Yu Gothic UI','Microsoft YaHei UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-        header{display:flex;align-items:center;gap:14px;min-height:36px;padding:12px 20px 6px;font-size:11px;color:#94a6a0;-webkit-app-region:drag;app-region:drag;cursor:move}
-        #title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:5px 7px;border-radius:5px;-webkit-app-region:no-drag;app-region:no-drag}button:hover{color:#fff;background:#ffffff12}button:focus-visible{outline:2px solid #b8e6cf}
-        main{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:10px 24px 18px;gap:12px}
-        #line{font-size:var(--size);font-weight:700;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}
-        .syllable{--fill:0%;background:linear-gradient(to right,#f4f0e8 var(--fill),#687770 var(--fill));background-clip:text;-webkit-background-clip:text;color:transparent}
-        #translation{color:#c9d8ce;font-size:calc(var(--size)*.6);line-height:1.55;white-space:pre-wrap}
-        #translation:empty{display:none}#next{font-size:calc(var(--size)*.65);color:#6b7b74;line-height:1.5;white-space:pre-wrap}
-        @media(max-height:200px){header{padding:5px 14px 0}main{padding:4px 15px 8px;gap:4px}#next{display:none}}
-      `;
+      style.textContent = STYLE;
       pip.document.head.appendChild(style);
-      pip.document.body.innerHTML = '<header title="拖动歌名区域移动窗口"><span id="title"></span><button id="smaller" aria-label="缩小字号">A−</button><button id="larger" aria-label="放大字号">A+</button><button id="play">播放</button></header><main><div id="line"></div><div id="translation"></div><div id="next"></div></main>';
-      nodes = Object.fromEntries(['title', 'line', 'translation', 'next', 'play'].map(id => [id, pip.document.getElementById(id)]));
+      pip.document.documentElement.style.setProperty('--size', `${size}px`);
+      pip.document.body.innerHTML = MARKUP;
+      nodes = Object.fromEntries(['island', 'cover', 'lyrics', 'line', 'translation', 'next', 'play', 'progress', 'auto'].map(id => [id, pip.document.getElementById(id)]));
+      nodes.auto.classList.toggle('on', autoOpen);
+      nodes.auto.onclick = () => setAutoOpen(!autoOpen);
       nodes.play.onclick = () => Spicetify.Player.togglePlay();
+      pip.document.getElementById('prev').onclick = () => Spicetify.Player.back();
+      pip.document.getElementById('nextTrack').onclick = () => Spicetify.Player.next();
       const resize = delta => {
-        size = Math.max(18, Math.min(60, size + delta));
+        size = Math.max(MIN_SIZE, Math.min(MAX_SIZE, size + delta));
         pip.document.documentElement.style.setProperty('--size', `${size}px`);
+        fit();
         try { localStorage.setItem('ivLyrics:desktop:font-size', String(size)); } catch {}
       };
       pip.document.getElementById('smaller').onclick = () => resize(-2);
       pip.document.getElementById('larger').onclick = () => resize(2);
+      pip.addEventListener('resize', () => nodes && fit());
       pip.addEventListener('pagehide', cleanup, { once: true });
       button && (button.active = true);
       uri = null;
@@ -197,8 +310,39 @@
   }
 
   function close() { if (pip && !pip.closed) pip.close(); }
+
+  function setAutoOpen(value) {
+    autoOpen = !!value;
+    if (!autoOpen) pendingOpen = false;
+    try { localStorage.setItem(AUTO_OPEN_KEY, String(autoOpen)); } catch {}
+    nodes?.auto.classList.toggle('on', autoOpen);
+    window.dispatchEvent(new CustomEvent('ivLyrics:desktop-auto-open', { detail: autoOpen }));
+  }
+
+  // requestWindow needs a user gesture. Playback started from a click or key in
+  // Spotify still carries one; media keys or remote devices do not, so the window
+  // waits for the next click or key press in Spotify.
+  function onPlayPause() {
+    const playing = Spicetify.Player.isPlaying();
+    if (playing && !wasPlaying && autoOpen && !(pip && !pip.closed)) {
+      if (navigator.userActivation?.isActive) void open();
+      else pendingOpen = true;
+    }
+    if (!playing) pendingOpen = false;
+    wasPlaying = playing;
+  }
+
+  function openFromGesture(event) {
+    if (!pendingOpen) return;
+    pendingOpen = false;
+    // The topbar button toggles the window itself; opening here would make its click close it.
+    if (button?.element?.contains?.(event.target)) return;
+    if (autoOpen && Spicetify.Player.isPlaying() && !(pip && !pip.closed)) void open();
+  }
+
   window.ivLyricsDesktop = {
-    open, close,
+    open, close, setAutoOpen,
+    get autoOpen() { return autoOpen; },
     getState: () => ({ open: !!pip && !pip.closed, uri, lines: lines.length, active, offset, translation: nodes?.translation.textContent || '', timerActive: timer !== null })
   };
   window.addEventListener('pagehide', close, { once: true });
@@ -207,6 +351,10 @@
     button = new Spicetify.Topbar.Button('桌面歌词（画中画）', ICON, () => {
       if (pip && !pip.closed) close(); else void open();
     });
+    Spicetify.Player.addEventListener('onplaypause', onPlayPause);
+    window.addEventListener('pointerdown', openFromGesture, true);
+    window.addEventListener('keydown', openFromGesture, true);
+    onPlayPause();
   };
   init();
 })();
