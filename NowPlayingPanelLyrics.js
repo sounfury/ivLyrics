@@ -4182,7 +4182,8 @@ body.ivlyrics-starrynight-theme .Root__now-playing-bar {
                 const displayMode1 = window.CONFIG?.visual?.[`translation-mode:${modeKey}`] ||
                     localStorage.getItem(`ivLyrics:visual:translation-mode:${modeKey}`) || "none";
                 const displayMode2 = window.CONFIG?.visual?.[`translation-mode-2:${modeKey}`] ||
-                    localStorage.getItem(`ivLyrics:visual:translation-mode-2:${modeKey}`) || "none";
+                    localStorage.getItem(`ivLyrics:visual:translation-mode-2:${modeKey}`) ||
+                    window.LyricsService?.getDefaultTranslationMode?.(2, modeKey) || "none";
                 const configuredTargetLanguage = getStorageValue(
                     'ivLyrics:visual:translate:target-language',
                     'auto'

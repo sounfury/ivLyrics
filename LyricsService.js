@@ -8163,6 +8163,12 @@
         return Promise.allSettled(sends);
     };
 
+    const DEFAULT_TRANSLATION_MODE_2_KEYS = new Set([
+        'english', 'japanese', 'korean', 'russian', 'vietnamese', 'german', 'swedish',
+        'spanish', 'french', 'italian', 'portuguese', 'dutch', 'polish', 'turkish',
+        'arabic', 'hindi', 'thai', 'indonesian', 'malay', 'gemini'
+    ]);
+
     const LyricsService = {
         // 버전 정보
         version: "1.0.0",
@@ -8597,6 +8603,16 @@
          * @param {string[]} options.providerOrder - provider 순서
          * @returns {Promise<Object>} - { lyrics, provider, error }
          */
+        /**
+         * Unsaved display-mode default, matching CONFIG in index.js. Background
+         * consumers (desktop lyrics, panel) run before the page defines CONFIG.
+         * @param {number} slot - 1 (발음 등) or 2 (번역 등)
+         * @param {string} modeKey - e.g. japanese, gemini
+         */
+        getDefaultTranslationMode(slot, modeKey) {
+            return slot === 2 && DEFAULT_TRANSLATION_MODE_2_KEYS.has(modeKey) ? 'gemini_ko' : 'none';
+        },
+
         async getFullLyrics(info, options = {}) {
             const {
                 displayMode1 = null,
@@ -8696,15 +8712,16 @@
                 const modeKey = friendlyLanguage || "gemini";
 
                 // 설정 키: translation-mode:japanese, translation-mode-2:japanese 등
+                const defaultMode2 = this.getDefaultTranslationMode(2, modeKey);
                 if (mode1 === null) {
                     mode1 = Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode:${modeKey}`) || "none";
                 }
                 if (mode2 === null) {
-                    mode2 = Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || "none";
+                    mode2 = Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || defaultMode2;
                 }
                 presentationSettingsCurrent = () => (
                     (displayMode1 !== null || mode1 === (Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode:${modeKey}`) || 'none'))
-                    && (displayMode2 !== null || mode2 === (Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || 'none'))
+                    && (displayMode2 !== null || mode2 === (Spicetify.LocalStorage.get(`ivLyrics:visual:translation-mode-2:${modeKey}`) || defaultMode2))
                 );
 
                 serviceDebug('[LyricsService] 언어 감지:', { detectedLanguage, friendlyLanguage, modeKey, mode1, mode2 });
