@@ -102,17 +102,40 @@
     }
   }
 
-  // Long lines shrink to fit one row first; very long ones wrap to two rows.
+  // Fit the lyric block (line, background vocals, translation) into the window:
+  // shrink a long line onto one row first, otherwise wrap and shrink until the
+  // whole block fits the height, so nothing is clipped at the window edges.
   function fit() {
-    const el = nodes.line;
-    el.classList.remove('wrap');
-    el.style.setProperty('--fit', '1');
-    const ratio = el.clientWidth / Math.max(1, el.scrollWidth);
-    if (ratio >= 1) return;
-    if (ratio >= 0.66) el.style.setProperty('--fit', (ratio * 0.98).toFixed(3));
-    else {
-      el.style.setProperty('--fit', '0.72');
-      el.classList.add('wrap');
+    const block = nodes.lyrics;
+    const islandStyle = pip.getComputedStyle(nodes.island);
+    const maxHeight = nodes.island.clientHeight - parseFloat(islandStyle.paddingTop) - parseFloat(islandStyle.paddingBottom);
+    const apply = (scale, wrap) => {
+      block.classList.toggle('wrap', wrap);
+      block.style.setProperty('--fit', scale.toFixed(3));
+    };
+    const widthRatio = el => el.scrollWidth ? el.clientWidth / el.scrollWidth : 1;
+    apply(1, false);
+    const oneRow = Math.min(1, widthRatio(nodes.line) * 0.98, widthRatio(nodes.translation) * 0.98);
+    if (oneRow >= 0.72) {
+      apply(oneRow, false);
+      if (block.offsetHeight <= maxHeight + 1) return;
+    }
+    let low = 0.45, high = 1;
+    for (let i = 0; i < 7; i++) {
+      const scale = (low + high) / 2;
+      apply(scale, true);
+      if (block.offsetHeight <= maxHeight + 1) low = scale; else high = scale;
+    }
+    apply(low, true);
+  }
+
+  function appendSyllables(parent, units) {
+    for (const unit of units) {
+      const span = pip.document.createElement('span');
+      span.textContent = unit.text;
+      span.className = 'syllable';
+      parent.appendChild(span);
+      syllableNodes.push({ span, start: Number(unit.startTime), end: Number(unit.endTime), value: -1 });
     }
   }
 
@@ -127,12 +150,14 @@
     const units = lead?.syllables || line?.syllables;
     const track = getTrack();
     if (units?.length) {
-      for (const unit of units) {
-        const span = pip.document.createElement('span');
-        span.textContent = unit.text;
-        span.className = 'syllable';
-        nodes.line.appendChild(span);
-        syllableNodes.push({ span, start: Number(unit.startTime), end: Number(unit.endTime), value: -1 });
+      appendSyllables(nodes.line, units);
+      // Background vocals sing over the lead; show each as a smaller row below it.
+      for (const part of line.vocals?.background || []) {
+        if (!part?.syllables?.length) continue;
+        const row = pip.document.createElement('span');
+        row.className = 'bg';
+        nodes.line.appendChild(row);
+        appendSyllables(row, part.syllables);
       }
     } else if (line) {
       nodes.line.textContent = original(line) || '♪';
@@ -216,11 +241,13 @@
     #cover{flex:none;width:44px;height:44px;border-radius:12px;background:#1c1c1e center/cover no-repeat;box-shadow:0 0 0 .5px #ffffff1f inset;transition:transform .45s cubic-bezier(.2,.9,.3,1.3)}
     #cover.empty{background-image:radial-gradient(circle at 30% 30%,#3a3a3c,#1c1c1e)}
     .paused #cover{transform:scale(.86)}
-    #lyrics{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px}
-    #line{--fit:1;font-size:calc(var(--size) * var(--fit));font-weight:650;letter-spacing:-.01em;line-height:1.28;white-space:pre;overflow:hidden}
-    #line.wrap{white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+    #lyrics{--fit:1;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px}
+    #line{font-size:calc(var(--size) * var(--fit));font-weight:650;letter-spacing:-.01em;line-height:1.28;white-space:pre;overflow:hidden}
+    .bg{display:block;font-size:.7em;font-weight:600}
+    .wrap #line,.wrap #translation{white-space:pre-wrap;overflow-wrap:anywhere;text-overflow:clip}
     .syllable{--fill:0%;background:linear-gradient(to right,#fff var(--fill),#ffffff52 var(--fill));background-clip:text;-webkit-background-clip:text;color:transparent}
-    #translation{font-size:calc(var(--size) * .56);color:#ffffffa6;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bg .syllable{background-image:linear-gradient(to right,#ffffffc0 var(--fill),#ffffff38 var(--fill))}
+    #translation{font-size:calc(var(--size) * .56 * max(var(--fit), .8));color:#ffffffa6;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #translation:empty{display:none}
     #next{display:none;margin-top:4px;font-size:calc(var(--size) * .56);color:#ffffff59;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #side{flex:none;position:relative;width:34px;height:100%;display:flex;align-items:center;justify-content:center;-webkit-app-region:no-drag;app-region:no-drag;cursor:default}
