@@ -1,6 +1,6 @@
 <img width="2208" height="512" alt="ivLyrics — Enjoy music in your language" src="https://github.com/ivLis-Studio/ivLyrics/blob/main/preview_readme_en.png?raw=true" />
 
-[한국어](README.md) · [English](README_EN.md)
+[한국어](README.md) · [English](README_EN.md) · [简体中文（网易云分支）](README_ZH.md)
 
 # ivLyrics
 
