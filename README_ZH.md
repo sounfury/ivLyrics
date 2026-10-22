@@ -2,7 +2,7 @@
 
 # ivLyrics · 网易云分支
 
-这是 [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics) 的非官方分支，面向中文听众，**定制内容都在 `netease` 分支上**。ivLyrics 是 Spotify 桌面版的 Spicetify 歌词扩展，可以同时显示原文、发音和翻译。本分支在它的基础上增加了网易云歌词、网易云人工翻译和不需要额外安装程序的桌面歌词。
+这是 [ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics) 的非官方分支，面向中文听众，**定制内容都在 `netease` 分支上**。ivLyrics 是 Spotify 桌面版的 Spicetify 歌词扩展，可以同时显示原文、发音和翻译。本分支在它的基础上增加了网易云与 QQ 音乐歌词、两者的人工翻译和不需要额外安装程序的桌面歌词。
 
 原版的完整功能介绍见 [官方 README](README.md)（[English](README_EN.md)）。本页只说明这个分支改了什么、怎么安装。
 
@@ -18,6 +18,14 @@
 - 翻译提供商里新增「NetEase Translation（网易云人工翻译）」，直接使用网易云用户上传的人工译文，不调用 AI，也不需要 API Key。
 - 优先使用与歌词源同一首网易云歌曲的译文，并对齐到当前显示的每一行。网易云没有译文时，交给列表中的下一个翻译提供商。
 - 仅在翻译目标语言为中文时生效。
+
+### QQ 音乐歌词与人工翻译
+
+- 新增「QQ Music（QQ音乐）」歌词源，读取原生 QRC 逐字时间轴，无 QRC 时使用逐行 LRC。
+- 新增「QQ Music Translation（QQ音乐人工翻译）」提供商，读取 QQ 音乐已有的中文译文，并复用歌词源匹配的同一首歌曲。
+- 参考 Lyricify 的移动端/桌面端搜索与分组版本处理，带专辑搜索并严格校验版本和时长；JavaScript 本地解密，无需额外程序、Cookie 或 API Key。
+- 在 AI 提供商里启用 QQ 翻译，再调整至机器翻译前面；歌词源和单曲设置按现有偏好保留。没有中文译文时继续尝试其他翻译提供商。
+- 协议与使用说明见 [QQ 音乐接入说明](docs/qqmusic-source.md)。
 
 ### 桌面歌词（灵动岛样式）
 
@@ -64,7 +72,7 @@
 
 在 **歌词提供商** 中启用「NetEase（网易云音乐）」，在 **AI 提供商** 中启用「NetEase Translation（网易云人工翻译）」，并把两者都拖到第一位。歌词和翻译来自同一首网易云歌曲时，最容易对齐。
 
-网易云的数据也可能缺失或有错，并不是每一行都有人工翻译；需要时可以在它后面再排一个 AI 翻译提供商兜底。
+也可以改用「QQ Music（QQ音乐）」与「QQ Music Translation（QQ音乐人工翻译）」这一组合。两个平台的数据都可能缺失或有错，并不是每一行都有人工翻译；需要时可以在人工翻译后面再排一个机器翻译提供商兜底。
 
 ## 更新
 
@@ -84,4 +92,5 @@ spicetify apply
 - 原项目：[ivLis-Studio/ivLyrics](https://github.com/ivLis-Studio/ivLyrics)，感谢原作者和贡献者。
 - 本分支与原作者无关，问题请在本仓库提 issue，不要反馈到官方仓库。
 - 与原项目相同，使用 [LGPL-2.1](LICENSE) 许可证。
-- 网易云相关功能使用网易云音乐的公开接口，歌词与译文版权归原权利人所有。
+- 网易云与 QQ 音乐相关功能使用各自的公开接口，歌词与译文版权归原权利人所有。
+- QQ 协议接入参考 [Lyricify Lyrics Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper) 的公开资料，以 JavaScript 独立实现；详见 [接入说明](docs/qqmusic-source.md)。
