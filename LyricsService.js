@@ -8641,8 +8641,13 @@
             };
 
             try {
-                // 1. 가사 가져오기 (LyricsAddonManager 사용)
-                const lyricsResult = await this.getLyricsFromProviders(info);
+                // Match the page's per-track provider choice. Background consumers
+                // must not silently use another source when that choice has no lyrics.
+                const forcedProviderId = Utils.extractTrackId(info?.uri)
+                    ? (await this.getTrackLyricsProviderOverride?.(info.uri) || null)
+                    : null;
+                if (!isCurrentRequest()) return staleResult();
+                const lyricsResult = await this.getLyricsFromProviders(info, [], 1, forcedProviderId);
                 const providerSnapshot = this.getLyricsSnapshot(info?.uri);
                 // This request may publish one raw result. A page, panel or other
                 // fallback presentation published during the await must win.

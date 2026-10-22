@@ -53,6 +53,8 @@ function load() {
             ${method('        async getFullLyrics(', '\n        /**\n         * 커뮤니티 싱크 데이터 가져오기')}
         };`, context);
     const service = context.service;
+    service.getDefaultTranslationMode = () => 'none';
+    service.getTrackLyricsProviderOverride = async () => null;
     service.getLyricsSnapshot = uri => snapshots.get(uri) || null;
     service.publishLyricsSnapshot = update => {
         const prior = snapshots.get(update.trackUri);
@@ -70,6 +72,46 @@ function load() {
             source: 'ivlyrics-page', displayLyrics: [{ text: 'Original', text2: 'Page translation' }], presentationComplete: true }),
     };
 }
+
+test('background lyrics honor the same per-track provider as the main page', async () => {
+    for (const choice of ['spotify', 'netease', null]) {
+        const h = load();
+        const calls = [];
+        h.service.getTrackLyricsProviderOverride = async uri => {
+            assert.equal(uri, track.uri);
+            return choice;
+        };
+        h.setProvider((info, forcedProviderId) => {
+            calls.push({ info, forcedProviderId });
+            return forcedProviderId === 'netease'
+                ? { uri: info.uri, error: 'No lyrics found' }
+                : { ...result(), provider: 'spotify-MusixMatch' };
+        });
+        const output = await h.service.getFullLyrics(track, { skipTranslation: true });
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].forcedProviderId, choice);
+        if (choice === 'netease') {
+            assert.equal(output.error, 'No lyrics found');
+            assert.equal(h.sent[0].lyrics.length, 0, 'no silent switch to another source');
+        } else {
+            assert.equal(output.provider, 'spotify-MusixMatch');
+            assert.equal(h.published.at(-1).trackLyricsProviderOverride, choice);
+        }
+    }
+});
+
+test('track changes while reading the provider choice do not start an obsolete lookup', async () => {
+    const h = load(), pending = deferred();
+    let calls = 0;
+    h.service.getTrackLyricsProviderOverride = () => pending.promise;
+    h.setProvider(() => { calls++; return result(); });
+    const work = h.service.getFullLyrics(track);
+    h.setCurrentUri('spotify:track:next');
+    pending.resolve('spotify');
+    assert.equal((await work).stale, true);
+    assert.equal(calls, 0);
+    assert.equal(h.sent.length, 0);
+});
 
 test('fallback accepts its own raw snapshot and publishes captured target and notation', async () => {
     const h = load(); h.setNotation('ipa');

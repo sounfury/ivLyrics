@@ -19,7 +19,7 @@
 (() => {
     'use strict';
 
-    const CACHE_VERSION = 'netease-1';
+    const CACHE_VERSION = 'netease-3';
     const ADDON_INFO = {
         id: 'netease',
         name: 'NetEase (网易云音乐)',
@@ -44,7 +44,10 @@
         icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 4.5a1 1 0 0 1 1 1v3.6l2.7 1.6a1 1 0 1 1-1 1.7l-3.2-1.9a1 1 0 0 1-.5-.9V8.5a1 1 0 0 1 1-1z'
     };
 
-    const SEARCH_URL = 'https://music.163.com/api/search/get?limit=10&type=1&s=';
+    // Searches start with the album name (as Lyricify does): originals can rank
+    // below covers and other-language editions. For 嘉宾 张远 the Mandarin album
+    // recording is result 45 without the album and 13 with it.
+    const SEARCH_URL = 'https://music.163.com/api/search/get?limit=30&type=1&s=';
     const LYRIC_URL = 'https://music.163.com/api/song/lyric/v1?lv=-1&kv=-1&tv=-1&rv=-1&yv=-1&ytv=-1&yrv=-1&id=';
     const REQUEST_HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0',
@@ -81,8 +84,10 @@
 
     function cleanTitle(title) {
         return String(title ?? '')
-            .replace(/\s*[([（【][^)\]）】]*(feat|ft\.|with|remaster|version|ver\.|live|edit|mix|from|bonus)[^)\]）】]*[)\]）】]/gi, '')
-            .replace(/\s+-\s+.*(remaster|version|live|edit|mix|from).*$/i, '')
+            // Keep language and recording editions (Cantonese, live, remix, ...).
+            // Similar durations do not make these the same lyrics or recording.
+            .replace(/\s*[([（【](?:(?:feat\.?|ft\.?|with|from|bonus)\b|(?:\d{4}\s+)?remaster(?:ed)?\b)[^)\]）】]*[)\]）】]/gi, '')
+            .replace(/\s+-\s+(?:(?:\d{4}\s+)?remaster(?:ed)?\b|from\b).*$/i, '')
             .trim();
     }
 
@@ -92,17 +97,24 @@
         let score = 0;
 
         const name = normalizeText(cleanTitle(song.name));
-        if (name === wantedTitle) score += 4;
-        else if (name && wantedTitle && (name.includes(wantedTitle) || wantedTitle.includes(name))) score += 2;
+        // Title and artist are requirements, not bonuses that duration or album
+        // can outweigh. In particular, 嘉宾 and 嘉宾 (粤语版) use different lyrics.
+        if (!wantedTitle || name !== wantedTitle) return -Infinity;
+        score += 4;
 
-        const songArtists = (song.artists || []).map(a => normalizeText(a.name));
-        if (wantedArtists.some(a => songArtists.some(s => s === a || s.includes(a) || a.includes(s)))) score += 3;
+        const songArtists = (song.artists || []).map(a => normalizeText(a.name)).filter(Boolean);
+        if (wantedArtists.length) {
+            if (!wantedArtists.some(a => songArtists.includes(a))) return -Infinity;
+            score += 3;
+        }
         if (album && normalizeText(song.album?.name) === normalizeText(album)) score += 2;
 
         if (durationMs) {
-            const diff = Math.abs(durationMs - song.duration);
+            const candidateDuration = Number(song.duration);
+            if (!Number.isFinite(candidateDuration) || candidateDuration <= 0) return -Infinity;
+            const diff = Math.abs(durationMs - candidateDuration);
+            if (diff > MAX_DURATION_DIFF_MS) return -Infinity;
             if (diff < 3000) score += 3;
-            else if (diff > 15000) score -= 3;
         }
         return score;
     }
@@ -115,7 +127,14 @@
     }
 
     async function searchSong(info) {
-        const queries = [`${cleanTitle(info.title)} ${info.artist ?? ''}`.trim(), cleanTitle(info.title)];
+        const title = cleanTitle(info.title);
+        const artist = String(info.artist ?? '').trim();
+        const album = cleanTitle(info.album);
+        const queries = [
+            album ? `${title} ${artist} ${album}` : '',
+            `${title} ${artist}`,
+            title
+        ].map(query => query.replace(/\s+/g, ' ').trim()).filter(Boolean);
         for (const query of [...new Set(queries)]) {
             const songs = (await requestJson(SEARCH_URL + encodeURIComponent(query)))?.result?.songs;
             if (!songs?.length) continue;
@@ -128,8 +147,7 @@
                     bestScore = score;
                 }
             }
-            // Require a title or artist match on top of any duration bonus.
-            if (bestScore >= 5) return best;
+            if (best) return best;
         }
         return null;
     }
@@ -218,19 +236,19 @@
     const TEXT = {
         'zh-CN': {
             title: '网易云音乐：歌词 + 翻译一起用效果最好',
-            body1: '这个歌词源读取网易云的逐字歌词（YRC），没有逐字时退回逐行歌词。它会按歌名、歌手、专辑和时长挑选网易云上的歌曲，时长相差超过 5 秒就判定为不同版本（现场版、剪辑版等），交给下一个歌词源，避免歌词越唱越不同步。',
+            body1: '这个歌词源读取网易云的逐字歌词（YRC），没有逐字时退回逐行歌词。它要求歌名和歌手匹配，保留粤语版、现场版等版本标记，并结合专辑和时长挑选歌曲。版本不同或时长相差超过 5 秒时，会交给下一个歌词源。',
             body2: '建议同时开启「AI 提供商 / 翻译」里的「NetEase Translation（网易云人工翻译）」并把两者都排在第一位：原文和译文来自网易云的同一首歌，每一行都能一一对应，不会出现译文空行或一句被拆成两半。',
             body3: '网易云找不到这首歌、没有歌词或版本对不上时，会自动交给下面的歌词源；没有人工翻译时，翻译会退回到 Bing / Google 等机器翻译。'
         },
         'zh-TW': {
             title: '網易雲音樂：歌詞 + 翻譯一起用效果最好',
-            body1: '這個歌詞來源讀取網易雲的逐字歌詞（YRC），沒有逐字時退回逐行歌詞。它會依歌名、歌手、專輯和時長挑選網易雲上的歌曲，時長相差超過 5 秒就判定為不同版本，交給下一個歌詞來源。',
+            body1: '這個歌詞來源讀取網易雲的逐字歌詞（YRC），沒有逐字時退回逐行歌詞。它要求歌名和歌手匹配，保留粵語版、現場版等版本標記，並結合專輯和時長挑選歌曲。版本不同或時長相差超過 5 秒時，會交給下一個歌詞來源。',
             body2: '建議同時開啟「AI 供應商 / 翻譯」裡的「NetEase Translation（網易雲人工翻譯）」並把兩者都排在第一位：原文和譯文來自網易雲的同一首歌，每一行都能一一對應。',
             body3: '網易雲找不到歌曲或版本對不上時，會自動交給下面的歌詞來源；沒有人工翻譯時，翻譯會退回到機器翻譯。'
         },
         en: {
             title: 'NetEase: use it for both lyrics and translation',
-            body1: 'Loads NetEase syllable-synced lyrics (YRC), falling back to line-synced lyrics. The song is matched by title, artist, album and duration; a duration gap over 5 seconds is treated as another recording and handed to the next provider.',
+            body1: 'Loads NetEase syllable-synced lyrics (YRC), falling back to line-synced lyrics. Title and artist must match, preserving editions such as Cantonese and live versions; album and duration help select the recording. Different editions or duration gaps over 5 seconds are handed to the next provider.',
             body2: 'For the best result, also enable "NetEase Translation" under AI providers and put both first: original lines and translations then come from the same NetEase song and line up one to one.',
             body3: 'If NetEase has no match, the next lyrics provider is used; without a human translation, machine translation (Bing / Google) takes over.'
         }

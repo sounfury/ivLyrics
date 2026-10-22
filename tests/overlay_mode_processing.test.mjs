@@ -111,6 +111,7 @@ function load({ language = 'en', ai = null, conversions = {}, values = new Map()
         };`, context);
 
     const service = context.service;
+    service.getDefaultTranslationMode = () => 'none';
     service.getLyricsSnapshot = (uri) => snapshots.get(uri) || null;
     service.publishLyricsSnapshot = (update) => {
         const previous = snapshots.get(update.trackUri);
